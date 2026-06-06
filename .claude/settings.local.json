@@ -10,7 +10,9 @@
       "Bash(/home/aarav/Sentinel-Agent/.venv/bin/python *)",
       "Bash(/home/aarav/Sentinel-Agent/.venv/bin/ruff check *)",
       "Bash(/home/aarav/Sentinel-Agent/.venv/bin/mypy *)",
-      "Bash(echo \"---exit: $?---\")"
+      "Bash(echo \"---exit: $?---\")",
+      "Read(//home/aarav/.claude/projects/**)",
+      "Read(//home/aarav/.claude/**)"
     ]
   }
 }

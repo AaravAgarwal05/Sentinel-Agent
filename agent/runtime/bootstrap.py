@@ -11,7 +11,7 @@ _STARTUP_LOGGER = "agent.runtime.bootstrap"
 class BootstrapManager:
     """Initializes logging, loads settings, and emits startup events.
 
-    This is the only lifecycle component active in Phase 0. Future
+    This is the only lifecycle component active in Phase 1. Future
     phases will register additional managers on top of this skeleton,
     but the bootstrap manager itself is intentionally minimal.
     """
@@ -21,12 +21,13 @@ class BootstrapManager:
 
     def start(self) -> None:
         """Configure logging and emit the startup event."""
-        configure_logging(log_level=self._settings.log_level)
+        configure_logging(log_level=self._settings.runtime.log_level)
         logger = get_logger(_STARTUP_LOGGER)
         logger.info(
             "Sentinel Agent starting",
-            agent_name=self._settings.agent_name,
-            agent_version=self._settings.agent_version,
-            environment=self._settings.environment,
-            log_level=self._settings.log_level,
+            agent_name=self._settings.agent.name,
+            agent_version=self._settings.agent.version,
+            environment=self._settings.agent.environment,
+            log_level=self._settings.runtime.log_level,
+            cluster_name=self._settings.agent.cluster_name,
         )

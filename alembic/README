@@ -1,0 +1,21 @@
+# Alembic migrations for the Sentinel Agent.
+
+The database URL is read from the application configuration
+(`Settings().storage.database_url`) at runtime -- see `env.py` -- so
+the application and migrations share a single source of truth.
+
+## Usage
+
+```bash
+# Create a new revision
+poetry run alembic revision -m "describe the change"
+
+# Apply pending revisions
+poetry run alembic upgrade head
+
+# Roll back one revision
+poetry run alembic downgrade -1
+```
+
+No migration files exist yet. `alembic upgrade head` against an empty
+`versions/` directory is a no-op that succeeds cleanly.

@@ -1,0 +1,129 @@
+# ===== Byte-compiled / optimized / DLL files =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ===== Distribution / packaging =====
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ===== Virtual environments =====
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+
+# ===== Tests / coverage =====
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+coverage/
+htmlcov/
+.tox/
+.nox/
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ===== Type checkers / linters =====
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+.pyright/
+.bandit/
+
+# ===== Jupyter =====
+.ipynb_checkpoints/
+profile_default/
+ipython_config.py
+
+# ===== Secrets / env =====
+.env
+.env.*
+!.env.example
+.envrc
+
+# ===== Logs / runtime =====
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# ===== OS / editor =====
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+*.swp
+*.swo
+*~
+.vscode/
+!.vscode/settings.json.example
+!.vscode/extensions.json
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# ===== Docker =====
+docker-compose.override.yml
+.docker/
+*.tar
+*.tgz
+
+# ===== Helm / K8s =====
+charts/*/charts/
+*.tgz
+*.tar.gz
+helm-releases/
+
+# ===== Build / cache =====
+.cache/
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
+*.rej
+.local/
+
+# ===== Secrets / keys =====
+*.pem
+*.key
+*.crt
+secrets/
+.ansible/
+
+# ===== Profiling / debug =====
+*.prof
+*.lprof
+.pgviz/
+callgrind.out.*
+perf.data*
+massif.out.*

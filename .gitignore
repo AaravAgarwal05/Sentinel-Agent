@@ -1,10 +1,18 @@
-# ===== Byte-compiled / optimized / DLL files =====
+# ============================================================================
+# Sentinel Agent .gitignore
+# ============================================================================
+# Production-level ignore rules. Organized by category. Patterns marked
+# with a leading "!" are explicit "do track this" overrides.
+# ============================================================================
+
+# ----- Byte-compiled / optimized / DLL files -------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyd
 
-# ===== Distribution / packaging =====
+# ----- Distribution / packaging --------------------------------------------
 .Python
 build/
 develop-eggs/
@@ -23,8 +31,11 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+pip-wheel-metadata/
 
-# ===== Virtual environments =====
+# ----- Virtual environments ------------------------------------------------
 .venv/
 venv/
 env/
@@ -32,8 +43,10 @@ ENV/
 env.bak/
 venv.bak/
 .python-version
+.python-install/
+.python-venv/
 
-# ===== Tests / coverage =====
+# ----- Tests / coverage ----------------------------------------------------
 .pytest_cache/
 .coverage
 .coverage.*
@@ -44,37 +57,55 @@ htmlcov/
 .nox/
 *.cover
 .hypothesis/
-.pytest_cache/
+.cache/
 
-# ===== Type checkers / linters =====
+# ----- Type checkers / linters --------------------------------------------
 .mypy_cache/
 .dmypy.json
 dmypy.json
+mypy_report.txt
 .pyre/
 .pytype/
 .ruff_cache/
 .pyright/
 .bandit/
 
-# ===== Jupyter =====
+# ----- Jupyter ------------------------------------------------------------
 .ipynb_checkpoints/
 profile_default/
 ipython_config.py
 
-# ===== Secrets / env =====
+# ----- Environment / secrets ----------------------------------------------
 .env
 .env.*
 !.env.example
 .envrc
+.python_env
+venv.bak/
 
-# ===== Logs / runtime =====
+# ----- Logs / runtime ------------------------------------------------------
 *.log
 logs/
 *.pid
 *.seed
 *.pid.lock
+celerybeat-schedule
+celerybeat-schedule.dir
+*.sock
 
-# ===== OS / editor =====
+# ----- Local databases (SQLite, etc.) -------------------------------------
+# Project default writes sentinel_agent.db at the repo root.
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite3-journal
+instance/
+data/
+*.mdb
+
+# ----- OS / editor ---------------------------------------------------------
 .DS_Store
 Thumbs.db
 Desktop.ini
@@ -90,21 +121,34 @@ $RECYCLE.BIN/
 *.iml
 *.sublime-project
 *.sublime-workspace
+.fleet/
+.cursor/
+.aider*
+.history/
+.atom/
+.directory
+nohup.out
 
-# ===== Docker =====
+# ----- Docker --------------------------------------------------------------
 docker-compose.override.yml
+docker-compose.*.yml
+!.dockerignore
 .docker/
 *.tar
 *.tgz
+*.tar.gz
 
-# ===== Helm / K8s =====
+# ----- Helm / Kubernetes ---------------------------------------------------
 charts/*/charts/
+charts/*/Chart.lock
+charts/*/requirements.lock
 *.tgz
 *.tar.gz
 helm-releases/
+*.kubeconfig
+.kube/
 
-# ===== Build / cache =====
-.cache/
+# ----- Build / cache -------------------------------------------------------
 tmp/
 temp/
 *.tmp
@@ -112,18 +156,49 @@ temp/
 *.orig
 *.rej
 .local/
+.webassets-cache/
+.scrapy/
+.tox/
 
-# ===== Secrets / keys =====
+# ----- Secrets / keys ------------------------------------------------------
 *.pem
 *.key
 *.crt
+*.csr
+*.p12
+*.pfx
 secrets/
 .ansible/
+.terraform/
+*.tfstate
+*.tfstate.*
 
-# ===== Profiling / debug =====
+# ----- Profiling / debug ---------------------------------------------------
 *.prof
 *.lprof
 .pgviz/
 callgrind.out.*
 perf.data*
 massif.out.*
+.tracy/
+flamegraph.svg
+
+# ----- AI / assistant tooling ----------------------------------------------
+# Claude Code local session data and configuration.
+.claude/
+# Allow repo-level instructions if anyone ever adds one.
+!.claude/CLAUDE.md
+!.claude/settings.json
+# Other AI assistants.
+.aider.chat.history.md
+.continue/
+.cody/
+.windsurfrules
+
+# ----- Agent-specific runtime ----------------------------------------------
+# Local SQLite file written by the default StorageConfig.
+sentinel_agent.db
+sentinel_agent.db-shm
+sentinel_agent.db-wal
+# Local kubeconfig / cluster state if the agent ever shells out.
+agent_state/

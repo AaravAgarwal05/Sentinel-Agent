@@ -2,9 +2,9 @@
 
 Reads the database URL from the application configuration
 (``Settings().storage.database_url``) so the application and
-migrations stay in lockstep. No models exist yet, so
-``target_metadata`` is ``None``; the autogenerate workflow will
-become useful once future phases introduce ORM entities.
+migrations stay in lockstep. ``target_metadata`` is wired to
+``Base.metadata`` from :mod:`agent.storage.models` to support
+autogenerate.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from agent.config.settings import get_settings
+from agent.storage.models import Base
 from alembic import context
 
 # Alembic Config object -- provides access to values in alembic.ini.
@@ -28,9 +29,8 @@ config.set_main_option("sqlalchemy.url", get_settings().storage.database_url)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# ORM metadata for autogenerate support. No models exist yet; this
-# will be wired up in a future phase.
-target_metadata = None
+# ORM metadata for autogenerate support.
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:

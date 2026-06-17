@@ -1,0 +1,31 @@
+image:
+  repository: sentinel-agent
+  tag: latest
+  pullPolicy: IfNotPresent
+
+agent:
+  clusterName: default
+  environment: development
+
+sentinel:
+  apiUrl: https://api.sentinel.example.com
+  registrationToken: ""
+  mockMode: true
+
+heartbeat:
+  intervalSeconds: 30
+
+storage:
+  databaseUrl: sqlite:///./sentinel_agent.db
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

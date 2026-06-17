@@ -52,3 +52,6 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 pythonpath = ["."]
 addopts = "-v --tb=short"
+markers = [
+    "helm: Helm chart rendering tests (skipped if helm CLI not available)",
+]

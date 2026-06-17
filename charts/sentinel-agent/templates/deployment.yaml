@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sentinel-agent.fullname" . }}
+  labels:
+    {{- include "sentinel-agent.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "sentinel-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sentinel-agent.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: sentinel-agent
+      containers:
+        - name: sentinel-agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python"]
+          args: ["-m", "src.main"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "sentinel-agent.fullname" . }}-config
+            - secretRef:
+                name: {{ include "sentinel-agent.fullname" . }}-secret
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "from agent.runtime.health import cli_health; cli_health()"
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "from agent.runtime.health import cli_ready; cli_ready()"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

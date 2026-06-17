@@ -11,6 +11,8 @@ __pycache__/
 *$py.class
 *.so
 *.pyd
+*.manifest
+cython_debug/
 
 # ----- Distribution / packaging --------------------------------------------
 .Python
@@ -45,6 +47,15 @@ venv.bak/
 .python-version
 .python-install/
 .python-venv/
+# Local per-project poetry config (lockfile is tracked; toml is local)
+poetry.toml
+# Pipenv / PDM / Hatch
+Pipfile.lock
+Pipfile
+.pdm.toml
+.pdm-python/
+.hatch/
+hatch.toml
 
 # ----- Tests / coverage ----------------------------------------------------
 .pytest_cache/
@@ -58,6 +69,10 @@ htmlcov/
 *.cover
 .hypothesis/
 .cache/
+# CI / test artifact directories
+junit/
+test-results/
+.tmp-test*/
 
 # ----- Type checkers / linters --------------------------------------------
 .mypy_cache/
@@ -107,6 +122,9 @@ data/
 
 # ----- OS / editor ---------------------------------------------------------
 .DS_Store
+.DS_Store?
+.AppleDouble
+.LSOverride
 Thumbs.db
 Desktop.ini
 ehthumbs.db
@@ -129,6 +147,15 @@ $RECYCLE.BIN/
 .directory
 nohup.out
 
+# ----- Documentation builds ------------------------------------------------
+docs/_build/
+docs/build/
+docs/_site/
+_site/
+site/
+*.mdx-output/
+.bible/
+
 # ----- Docker --------------------------------------------------------------
 docker-compose.override.yml
 docker-compose.*.yml
@@ -147,6 +174,26 @@ charts/*/requirements.lock
 helm-releases/
 *.kubeconfig
 .kube/
+
+# ----- Cloud / infrastructure ----------------------------------------------
+# Terraform
+.terraform.lock.hcl
+crash.log
+crash.*.log
+terraform.rc
+# Pulumi
+Pulumi.*.yaml
+# Ansible
+*.retry
+# SOPS / encryption
+.sops.yaml
+.sops.yml
+*.age
+.secret/
+.vault/
+vault_*
+# kOps
+kops-*.yaml
 
 # ----- Build / cache -------------------------------------------------------
 tmp/
@@ -173,6 +220,18 @@ secrets/
 *.tfstate
 *.tfstate.*
 
+# ----- CI / CD -------------------------------------------------------------
+.teamcity/
+.gradle/
+buildNumber.properties
+# GitHub Actions local runners
+.ACTIONS_RUNTIME_TOKEN
+.ACTIONS_CACHE_URL
+# Jenkins
+workspace/
+config.xml
+*.junit
+
 # ----- Profiling / debug ---------------------------------------------------
 *.prof
 *.lprof
@@ -182,6 +241,10 @@ perf.data*
 massif.out.*
 .tracy/
 flamegraph.svg
+benchmark/
+*.bench
+*.benchmark
+*.stats
 
 # ----- AI / assistant tooling ----------------------------------------------
 # Claude Code local session data and configuration.
@@ -189,6 +252,8 @@ flamegraph.svg
 # Allow repo-level instructions if anyone ever adds one.
 !.claude/CLAUDE.md
 !.claude/settings.json
+# Claude Flow runtime data and workflow scripts (local artifacts).
+.claude-flow/
 # Other AI assistants.
 .aider.chat.history.md
 .continue/

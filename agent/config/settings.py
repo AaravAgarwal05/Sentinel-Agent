@@ -52,6 +52,7 @@ class SentinelConfig(BaseModel):
         min_length=1,
     )
     registration_token: str = Field(default="")
+    mock_mode: bool = Field(default=True)
 
 
 class HeartbeatConfig(BaseModel):
@@ -77,7 +78,7 @@ class StorageConfig(BaseModel):
 # resolves to ``settings.<domain>.<field>``.
 _FIELD_MAP: dict[str, list[str]] = {
     "agent": ["name", "version", "cluster_name", "environment"],
-    "sentinel": ["api_url", "registration_token"],
+    "sentinel": ["api_url", "registration_token", "mock_mode"],
     "heartbeat": ["interval_seconds"],
     "runtime": ["log_level"],
     "storage": ["database_url"],

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: sentinel-agent
+description: "A Helm chart for deploying Sentinel Agent on Kubernetes"
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - security
+  - kubernetes
+  - agent
+maintainers:
+  - name: "Aarav Agarwal"
+    email: "aara.knp.08@gmail.com"

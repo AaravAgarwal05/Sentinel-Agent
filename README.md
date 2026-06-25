@@ -1,20 +1,35 @@
 # Sentinel Agent
 
-A Kubernetes runtime security agent that performs detection, evidence collection, diagnostics, and remediation across a cluster.
+A Kubernetes runtime security agent that detects pod failures, collects context evidence, runs diagnostics, and delivers structured reports to the SentinelAI control plane.
+
+Supports real and mock mode — runs fully offline for development and CI, or against a live control plane for production.
 
 ## Current Phase
 
-**Milestone 5 — Transport MVP**
+**Milestone 5 complete — Transport pipeline validated end-to-end**
 
-Milestone 4 delivered deterministic, rule-based diagnostic analysis. **Milestone 5** delivers outbound delivery of diagnostic reports to the SentinelAI control plane:
+The agent detects pod failures (CrashLoopBackOff, OOMKilled, ImagePullBackOff), collects Kubernetes context (pod spec, events, namespace, deployment chain, node), runs rule-based diagnostic analysis, and delivers structured reports to SentinelAI over HTTP. A retry loop with configurable limits handles transient delivery failures.
 
-- **OutboundReport model** — tracks delivery status (PENDING / DELIVERED / FAILED) with retry support
-- **SentinelAIClient** — HTTP(S) client for delivering incident + diagnostic payloads to SentinelAI
-- **TransportService** — orchestrates enqueue and delivery with configurable retry limits
-- **RetryService** — background thread that periodically retries failed deliveries
-- **Idempotent delivery** — PENDING → DELIVERED on success; PENDING → retry → FAILED after max retries
-- **Mock mode** — all transport operations work locally without a live control plane
-- **Full integration** — transport is triggered automatically after diagnostics completes for every new incident
+| Capability | Status | Notes |
+|-----------|--------|-------|
+| Detection (Watch API + polling) | ✅ | CrashLoopBackOff, OOMKilled, ImagePullBackOff |
+| Context collection (6 collectors) | ✅ | Pod, Deployment, ReplicaSet, Namespace, Events, Node |
+| Diagnostic analysis (rule-based) | ✅ | Per-incident-type analyzers with confidence scoring |
+| Transport (HTTP delivery) | ✅ | Retries, mock mode, status tracking |
+| Heartbeat (scheduler exists) | ⚠️ | Mock mode only — see [docs/required-updates.md](docs/required-updates.md) |
+| Agent registration | ✅ | Real and mock flows |
+| Persistent storage (SQLite) | ✅ | Alembic migrations for schema management |
+| Helm deployment | ✅ | RBAC, ConfigMap, health probes |
+| E2E validation (two-kind cluster) | ✅ | Cross-cluster NodePort delivery confirmed |
+
+### Known Gaps
+
+| Issue | Impact | Target |
+|-------|--------|--------|
+| Heartbeats in mock mode only | Control plane has no agent liveness visibility | See [required-updates.md](docs/required-updates.md) |
+| SQLite in ephemeral pod | PENDING reports lost on pod restart | PVC or external queue |
+| No idempotency key | Duplicate delivery possible on retry | sentinel-api dedup |
+| No dead-letter queue | FAILED reports vanish after max_retries | DLQ table or alert |
 
 ## Directory Structure
 
@@ -53,50 +68,50 @@ sentinel-agent/
 │   │   └── scheduler.py         # APScheduler wrapper
 │   ├── detection/               # Detection engine (Milestone 2)
 │   │   ├── __init__.py
-│   │   ├── incident.py           # SQLAlchemy Incident model + enums
-│   │   ├── models.py             # Pydantic IncidentCandidate / IncidentResponse
-│   │   ├── repositories.py       # IncidentRepository
-│   │   ├── service.py            # DetectionService orchestrator
-│   │   ├── watcher.py            # Kubernetes Watch API engine
-│   │   ├── polling.py            # Periodic polling fallback
+│   │   ├── incident.py          # SQLAlchemy Incident model + enums
+│   │   ├── models.py            # Pydantic IncidentCandidate / IncidentResponse
+│   │   ├── repositories.py      # IncidentRepository
+│   │   ├── service.py           # DetectionService orchestrator
+│   │   ├── watcher.py           # Kubernetes Watch API engine
+│   │   ├── polling.py           # Periodic polling fallback
 │   │   └── detectors/
 │   │       ├── __init__.py
-│   │       ├── base.py           # Detector ABC + DetectorRegistry
-│   │       ├── crashloop.py      # CrashLoopBackOffDetector
-│   │       ├── oomkilled.py      # OOMKilledDetector
-│   │       └── imagepull.py      # ImagePullBackOffDetector
+│   │       ├── base.py          # Detector ABC + DetectorRegistry
+│   │       ├── crashloop.py     # CrashLoopBackOffDetector
+│   │       ├── oomkilled.py     # OOMKilledDetector
+│   │       └── imagepull.py     # ImagePullBackOffDetector
 │   ├── collection/              # Context collection engine (Milestone 3)
 │   │   ├── __init__.py
-│   │   ├── models.py             # IncidentContext SQLAlchemy model + ContextType
-│   │   ├── repositories.py       # IncidentContextRepository
-│   │   ├── service.py            # CollectionService orchestrator
+│   │   ├── models.py            # IncidentContext SQLAlchemy model + ContextType
+│   │   ├── repositories.py      # IncidentContextRepository
+│   │   ├── service.py           # CollectionService orchestrator
 │   │   └── collectors/
 │   │       ├── __init__.py
-│   │       ├── base.py           # Collector ABC + ContextResult
-│   │       ├── pod.py            # Pod metadata collector
-│   │       ├── deployment.py     # Deployment collector (ownerRef tracing)
-│   │       ├── replicaset.py     # ReplicaSet collector (ownerRef tracing)
-│   │       ├── namespace.py      # Namespace metadata collector
-│   │       ├── events.py         # Events collector (newest-first, capped)
-│   │       └── node.py           # Node collector (if pod scheduled)
+│   │       ├── base.py          # Collector ABC + ContextResult
+│   │       ├── pod.py           # Pod metadata collector
+│   │       ├── deployment.py    # Deployment collector (ownerRef tracing)
+│   │       ├── replicaset.py    # ReplicaSet collector (ownerRef tracing)
+│   │       ├── namespace.py     # Namespace metadata collector
+│   │       ├── events.py        # Events collector (newest-first, capped)
+│   │       └── node.py          # Node collector (if pod scheduled)
 │   ├── diagnostics/             # Diagnostics engine (Milestone 4)
 │   │   ├── __init__.py
-│   │   ├── models.py             # DiagnosticReport model + DiagnosticResult
-│   │   ├── repositories.py       # DiagnosticReportRepository
-│   │   ├── service.py            # DiagnosticService orchestrator
+│   │   ├── models.py            # DiagnosticReport model + DiagnosticResult
+│   │   ├── repositories.py      # DiagnosticReportRepository
+│   │   ├── service.py           # DiagnosticService orchestrator
 │   │   └── analyzers/
 │   │       ├── __init__.py
-│   │       ├── base.py           # DiagnosticAnalyzer ABC
-│   │       ├── image_pull.py     # ImagePullBackOff analyzer
-│   │       ├── crashloop.py      # CrashLoopBackOff analyzer
-│   │       └── oomkilled.py      # OOMKilled analyzer
+│   │       ├── base.py          # DiagnosticAnalyzer ABC
+│   │       ├── image_pull.py    # ImagePullBackOff analyzer
+│   │       ├── crashloop.py     # CrashLoopBackOff analyzer
+│   │       └── oomkilled.py     # OOMKilled analyzer
 │   ├── transport/               # Outbound delivery to SentinelAI (Milestone 5)
 │   │   ├── __init__.py
-│   │   ├── models.py             # OutboundReport model + OutboundStatus enum
-│   │   ├── repositories.py       # OutboundReportRepository
-│   │   ├── client.py             # SentinelAIClient (httpx)
-│   │   ├── service.py            # TransportService (enqueue / deliver)
-│   │   └── retry.py              # RetryService (background delivery loop)
+│   │   ├── models.py            # OutboundReport model + OutboundStatus enum
+│   │   ├── repositories.py      # OutboundReportRepository
+│   │   ├── client.py            # SentinelAIClient (httpx)
+│   │   ├── service.py           # TransportService (enqueue / deliver)
+│   │   └── retry.py             # RetryService (background delivery loop)
 │   ├── execution/               # Phase N+
 │   ├── leader/                  # Phase N+
 │   └── runtime/
@@ -137,7 +152,9 @@ sentinel-agent/
 │   ├── test_transport_service.py
 │   └── test_transport_retry.py
 ├── charts/
-│   └── sentinel-agent/          # Helm chart (Phase N+)
+│   └── sentinel-agent/          # Helm chart for Kubernetes deployment
+├── docs/
+│   └── required-updates.md      # Known gaps and pending changes
 ├── pyproject.toml
 ├── poetry.lock
 ├── Dockerfile
@@ -147,7 +164,7 @@ sentinel-agent/
 
 ## Configuration
 
-Settings are organized into seven nested Pydantic models and loaded from environment variables prefixed with `SENTINEL_`. There is no file-based loader in this milestone.
+Settings are organized into seven nested Pydantic models and loaded from environment variables prefixed with `SENTINEL_`. There is no file-based loader.
 
 ### Access
 
@@ -165,12 +182,6 @@ settings.detection.enabled
 settings.detection.polling_interval_seconds
 settings.collection.enabled
 settings.collection.max_events
-```
-
-```python
-from agent.config.settings import get_settings
-
-settings = get_settings()
 settings.transport.enabled
 settings.transport.base_url
 settings.transport.timeout_seconds
@@ -198,7 +209,6 @@ settings.transport.mock_mode
 | --- | --- | --- | --- |
 | `api_url` | `str` | `"https://api.sentinel.example.com"` | non-empty |
 | `registration_token` | `str` | `""` | — |
-| `mock_mode` | `bool` | `true` | — |
 | `mock_mode` | `bool` | `true` | — |
 
 **`HeartbeatConfig`** — heartbeat transmission settings.
@@ -322,7 +332,7 @@ with db.session() as session:
     ...
 ```
 
-### `ClusterIdentityRepository`, `CredentialsRepository`, `HeartbeatRepository`
+### Repositories
 
 Each repository encapsulates CRUD for its model. Repositories accept a `session` from the caller rather than managing transactions themselves:
 
@@ -356,6 +366,42 @@ To apply migrations against a temporary SQLite database:
 export SENTINEL_STORAGE_DATABASE_URL=sqlite:///./dev.db
 poetry run alembic upgrade head
 ```
+
+## Runtime Startup Sequence
+
+The `RuntimeManager` orchestrates the full agent lifecycle from `src/main.py`. The startup sequence is:
+
+```
+bootstrap → DB init → K8s client → registration → credentials → heartbeat → detection → transport retry
+```
+
+1. **Bootstrap** — configure structlog JSON logging, emit startup event with agent identity
+2. **Database** — initialize SQLAlchemy engine, create tables via `Base.metadata.create_all()`
+3. **Kubernetes client** — connect to the Kubernetes API for cluster metadata (graceful if unavailable)
+4. **Registration** — register with SentinelAI control plane via `RegistrationService.register()`
+5. **Credentials** — persist API key and agent ID returned by registration
+6. **Heartbeat** — start `HeartbeatScheduler` on a background thread (every `interval_seconds`)
+7. **Detection** — start `DetectionService` (pod watcher + poller + detector chain)
+8. **Transport retry** — start `RetryService` background loop (delivers pending reports every `retry_interval_seconds`)
+
+If registration fails (or is in mock mode), detection and transport retry still start — the agent runs independently but without a control plane connection.
+
+```python
+from agent.runtime.runtime_manager import RuntimeManager
+from agent.config.settings import get_settings
+
+manager = RuntimeManager(get_settings())
+manager.start()
+manager.wait()    # blocks until SIGTERM/SIGINT
+manager.stop()
+```
+
+### Health Checks
+
+The agent writes a timestamp marker to `/tmp/sentinel-agent-ready` at the end of a successful startup. Kubernetes exec probes check this file:
+
+- **Liveness probe**: checks marker file exists every 15s
+- **Readiness probe**: checks `RuntimeManager.started` flag every 10s
 
 ## Registration Flow
 
@@ -417,7 +463,7 @@ After registration, the agent sends periodic heartbeats to signal liveness to th
          ▼
   ┌──────────────────┐
   │ HeartbeatClient   │  POST /agent/heartbeat
-  │ .send(payload)    │
+  │ .send(payload)    │  (mock: logs and returns)
   └──────────────────┘
 ```
 
@@ -425,16 +471,9 @@ The `HeartbeatScheduler` wraps an APScheduler `BackgroundScheduler`. On `start()
 
 1. Builds a `HeartbeatPayload` with the current `cluster_id`, `agent_version`, and status.
 2. Sends it via `HeartbeatClient.send()`.
-3. In mock mode the tick is logged but no HTTP call is made.
+3. In mock mode (default), the tick is logged but **no HTTP call is made**.
 
-```python
-from agent.heartbeat.scheduler import HeartbeatScheduler
-
-scheduler = HeartbeatScheduler(cluster_id="my-cluster-uuid")
-scheduler.start()
-# ... agent runs ...
-scheduler.stop()
-```
+**Known gap**: To enable real heartbeats, the sentinel-api needs a `POST /agent/heartbeat` endpoint and the agent's `sentinel.mockMode` must be `false`. See [docs/required-updates.md](docs/required-updates.md) for the full change list.
 
 ## Mock Mode
 
@@ -444,29 +483,7 @@ When `SENTINEL_SENTINEL_MOCK_MODE=true` (the default), the agent operates withou
 - **Heartbeat** — `HeartbeatClient.send()` logs the payload and returns `True`. `HeartbeatScheduler._tick()` logs the tick and returns without making an HTTP call.
 - **Transport** — `SentinelAIClient.deliver()` logs the payload and returns `{"accepted": True}`. The full enqueue → deliver → DELIVERED lifecycle executes locally.
 
-Mock mode is designed for local development and CI. Set `SENTINEL_SENTINEL_MOCK_MODE=false` and `SENTINEL_TRANSPORT_MOCK_MODE=false` to connect to a real control plane.
-
-## Runtime Startup Sequence
-
-The `BootstrapManager` is the lifecycle entry point called from `src/main.py`. Its `start()` method performs the initial startup work:
-
-1. **Configure logging** — structlog is configured with the requested log level.
-2. **Emit startup event** — a JSON line with agent identity metadata is written to stdout.
-
-Future milestones will extend `BootstrapManager` to chain additional steps: initialize the database, register with the control plane, persist credentials, and start the heartbeat scheduler. The full eventual sequence is:
-
-```
-bootstrap → DB init → K8s client → registration → credentials → heartbeat → detection → transport
-```
-
-For now `start()` handles only logging and startup events; downstream callers own the rest of the lifecycle.
-
-```python
-from agent.runtime.bootstrap import BootstrapManager
-
-bootstrap = BootstrapManager()
-bootstrap.start()
-```
+Set `SENTINEL_SENTINEL_MOCK_MODE=false` and `SENTINEL_TRANSPORT_MOCK_MODE=false` to connect to a real control plane.
 
 ## Detection Architecture
 
@@ -503,14 +520,20 @@ The detection engine observes Kubernetes pods and creates incidents when known f
               │  (on new incident only)
               ▼
    ┌──────────────────────┐
-   │  CollectionService   │  ← Milestone 3
+   │  CollectionService   │
    │  (collect context)   │
    └──────────┬───────────┘
               │  (on new incident only)
               ▼
    ┌──────────────────────┐
-   │  DiagnosticService   │  ← Milestone 4
+   │  DiagnosticService   │
    │  (analyze & persist) │
+   └──────────┬───────────┘
+              │  (on new incident only)
+              ▼
+   ┌──────────────────────┐
+   │  TransportService    │
+   │  (enqueue delivery)  │
    └──────────────────────┘
 ```
 
@@ -526,9 +549,10 @@ The detection engine observes Kubernetes pods and creates incidents when known f
 
 1. **Detection** — A detector returns an `IncidentCandidate` for a failing pod.
 2. **Deduplication** — If an OPEN incident exists for the same `(incident_type, namespace, resource_name)`, its `last_seen_at` is updated instead of creating a new record.
-3. **Context Collection** — On **new incident** creation, `CollectionService` collects Pod, Deployment, ReplicaSet, Namespace, Events, and Node context and persists it to the `incident_context` table. Duplicate updates skip collection.
-4. **Resolution** — When a previously-failing pod becomes healthy (all containers ready) or is deleted, all OPEN incidents for that namespace/name are marked RESOLVED.
-5. **Persistence** — All incidents are persisted via `IncidentRepository` to the local SQLite database.
+3. **Context Collection** — On new incident creation, `CollectionService` collects Pod, Deployment, ReplicaSet, Namespace, Events, and Node context and persists it to the `incident_context` table.
+4. **Diagnostic Analysis** — `DiagnosticService` matches the incident type to an analyzer, runs analysis against the collected context, and persists a `DiagnosticReport`. If no analyzer matches, a fallback report is created.
+5. **Transport Enqueue** — `TransportService` enqueues the incident + diagnostic report for delivery (always, even on fallback reports).
+6. **Resolution** — When a previously-failing pod becomes healthy (all containers ready) or is deleted, all OPEN incidents for that namespace/name are marked RESOLVED.
 
 ### Components
 
@@ -546,8 +570,11 @@ After deployment, create failing pods to trigger detection:
 # ImagePullBackOff
 kubectl run test-image-pull --image=does-not-exist -n demo-apps
 
-# CrashLoopBackOff (already exists if crash-loop pod is running)
+# Check agent logs for detection events
 kubectl logs -n sentinel -l app.kubernetes.io/name=sentinel-agent | grep incident_detected
+
+# Check for transport delivery
+kubectl logs -n sentinel -l app.kubernetes.io/name=sentinel-agent | grep report_delivered
 ```
 
 ### Configuration
@@ -648,21 +675,6 @@ Collected context is persisted in the `incident_context` table:
 
 Each incident can have multiple context rows (one per collected type).
 
-### How to Verify
-
-Create a failing pod and check that context was collected:
-
-```bash
-# Trigger an incident
-kubectl run test-image-pull --image=does-not-exist -n demo-apps
-
-# Check the agent logs for context collection events
-kubectl logs -n sentinel -l app.kubernetes.io/name=sentinel-agent | grep context_collected
-
-# Expected output (JSON):
-# {"event": "context_collected", "incident_id": "...", "context_count": 6, ...}
-```
-
 ## Diagnostics Architecture
 
 The diagnostics engine converts incidents + collected context into structured diagnostic reports. It runs automatically after context collection completes for every newly created incident.
@@ -674,7 +686,7 @@ The diagnostics engine converts incidents + collected context into structured di
                ▼  (new incident only)
         ┌──────────────┐
         │  Collection   │
-        │  Service      │  ← Milestone 3
+        │  Service      │
         └──┬───┬───┬───┘
            │   │   │
      ┌─────▼┐ ┌▼──┐ ┌▼──────┐
@@ -706,7 +718,7 @@ The diagnostics engine converts incidents + collected context into structured di
                   │
                   ▼
    ┌──────────────────────────┐
-   │  TransportService        │  ← Milestone 5
+   │  TransportService        │
    │  .enqueue(incident,      │
    │    diagnostic_report)    │
    └──────────────┬───────────┘
@@ -714,7 +726,7 @@ The diagnostics engine converts incidents + collected context into structured di
                   ▼
    ┌──────────────────────────┐
    │  SentinelAIClient        │
-   │  POST /api/v1/incidents  │
+   │  POST /incident          │
    │  (mock: no-op)           │
    └──────────────────────────┘
 ```
@@ -757,7 +769,9 @@ class DiagnosticAnalyzer(ABC):
 2. **Select analyzer** — matches `incident_type` to an analyzer class via registry
 3. **Load context** — reads stored context from `incident_context` table via `IncidentContextRepository`
 4. **Run analyzer** — calls `analyzer.analyze(incident, context_package)`
-5. **Persist report** — stores the `DiagnosticReport` in the `diagnostic_report` table
+5. **Fallback** — if analyzer returns `None`, creates a fallback `DiagnosticReport` with root cause "Unknown (no diagnostic analysis)"
+6. **Persist report** — stores the `DiagnosticReport` in the `diagnostic_report` table
+7. **Transport** — enqueues the report for delivery (always, even for fallback reports)
 
 ### DiagnosticReport Model
 
@@ -771,21 +785,6 @@ class DiagnosticAnalyzer(ABC):
 | `evidence` | `JSON` (nullable) | Signals used, context sources, container statuses |
 | `analyzer_name` | `String(128)` | Name of the analyzer that produced the report |
 | `created_at` | `DateTime` | Server-generated timestamp |
-
-### Detection Integration
-
-Diagnostics run automatically as part of the incident lifecycle:
-
-1. **Detection** → pod failure detected, `Incident` created
-2. **Collection** → `CollectionService` gathers context (pod, events, node, etc.)
-3. **Diagnostics** → `DiagnosticService` analyzes incident + context, produces `DiagnosticReport`
-4. **Persistence** → report stored in `diagnostic_report` table
-5. **Transport** → `TransportService` enqueues report for delivery to SentinelAI
-
-Diagnostics run **only once** per newly created incident. Duplicate updates (same incident type/namespace/resource seen again) skip both collection and diagnostics. Errors in diagnostics are caught and logged — they never propagate to the watcher/poller loop.
-
-When a diagnostic report is successfully produced, `TransportService` enqueues it for
-delivery to the SentinelAI control plane (see [Transport Architecture](#transport-architecture)).
 
 ### How to Verify
 
@@ -821,9 +820,8 @@ Diagnostics complete
          ▼                           ▼
 ┌───────────────────┐     ┌──────────────────────┐
 │  SentinelAIClient  │     │  RetryService         │
-│  POST /api/v1/     │     │  (every interval_sec) │
-│    incidents       │     └──────────────────────┘
-└────────┬──────────┘
+│  POST /incident    │     │  (every interval_sec) │
+└────────┬──────────┘     └──────────────────────┘
          │
     ┌────┴────┐
     │         │
@@ -834,59 +832,37 @@ Diagnostics complete
 
 ### Components
 
-- **`OutboundReport`** — SQLAlchemy model tracking delivery of one (incident, diagnostic) pair.
-  Starts `PENDING`, transitions to `DELIVERED` on success or `FAILED` after exhausting retries.
+- **`OutboundReport`** — SQLAlchemy model tracking delivery of one (incident, diagnostic) pair. Starts `PENDING`, transitions to `DELIVERED` on success or `FAILED` after exhausting retries.
 
-- **`OutboundReportRepository`** — CRUD for `outbound_report` table. Supports `create()`,
-  `get_pending()` (ordered FIFO, default limit 50), `mark_delivered()`, `increment_retry()`,
-  and `mark_failed()`.
+- **`OutboundReportRepository`** — CRUD for `outbound_report` table. Supports `create()`, `get_pending()` (ordered FIFO, default limit 50), `mark_delivered()`, `increment_retry()`, and `mark_failed()`.
 
-- **`SentinelAIClient`** — HTTP(S) client using `httpx`. POSTs incident + diagnostic payloads
-  to `{base_url}/api/v1/incidents` with Bearer token auth. In mock mode, logs the payload
-  and returns `{"accepted": True}` without making an HTTP call.
+- **`SentinelAIClient`** — HTTP(S) client using `httpx`. POSTs a flat payload matching the sentinel-api `Incident` model to `{base_url}/incident`. Skips Authorization header when `api_key` is empty. In mock mode, logs the payload and returns `{"accepted": True}` without making an HTTP call.
 
 - **`TransportService`** — Orchestrator with two public methods:
-  - `enqueue(incident, diagnostic_report)` — builds JSON payload, creates `PENDING` OutboundReport
+  - `enqueue(incident, diagnostic_report)` — builds flat JSON payload, creates `PENDING` OutboundReport
   - `deliver_pending(limit=50)` — iterates pending reports, attempts delivery, updates status
 
-- **`RetryService`** — Background daemon thread that calls `deliver_pending()` at a configurable
-  interval. Survives individual exceptions. Uses `threading.Event` for clean shutdown.
+- **`RetryService`** — Background daemon thread that calls `deliver_pending()` at a configurable interval. Survives individual exceptions. Uses `threading.Event` for clean shutdown.
 
 ### Delivery Flow
 
-1. **Enqueue** — `TransportService.enqueue()` serializes incident + diagnostic data into a
-   compact JSON payload and creates an `OutboundReport` with `status=PENDING`.
-2. **Delivery attempt** — `deliver_pending()` reads pending reports (oldest first), deserializes
-   each payload, and calls `SentinelAIClient.deliver()`.
-3. **Outcome** — On HTTP 2xx, the report is marked `DELIVERED` with a timestamp. On failure,
-   `retry_count` is incremented. If `retry_count >= max_retries`, the report is marked `FAILED`.
-4. **Background retry** — `RetryService` runs `deliver_pending()` every `retry_interval_seconds`
-   on a background daemon thread, picking up any remaining `PENDING` reports.
+1. **Enqueue** — `TransportService.enqueue()` serializes incident + diagnostic data into a flat JSON payload matching the sentinel-api `Incident` model and creates an `OutboundReport` with `status=PENDING`.
+2. **Delivery attempt** — `deliver_pending()` reads pending reports (oldest first), deserializes each payload, and calls `SentinelAIClient.deliver()`.
+3. **Outcome** — On HTTP 2xx, the report is marked `DELIVERED` with a timestamp. On failure, `retry_count` is incremented. If `retry_count >= max_retries`, the report is marked `FAILED`.
+4. **Background retry** — `RetryService` runs `deliver_pending()` every `retry_interval_seconds` on a background daemon thread, picking up any remaining `PENDING` reports.
 
 ### Payload Structure
 
+The payload is a flat dict matching the sentinel-api `Incident` model (Pydantic v2 — extra fields rejected):
+
 ```json
 {
-  "incident": {
-    "id": "...",
-    "incident_type": "CrashLoopBackOff",
-    "severity": "CRITICAL",
-    "namespace": "default",
-    "resource_kind": "Pod",
-    "resource_name": "test-pod",
-    "message": "Pod crashed",
-    "first_seen_at": null,
-    "status": "OPEN"
-  },
-  "diagnostic_report": {
-    "id": "...",
-    "incident_id": "...",
-    "root_cause": "Application repeatedly crashing during startup",
-    "confidence": 0.9,
-    "summary": "Test summary",
-    "analyzer_name": "CrashLoopAnalyzer",
-    "created_at": null
-  }
+  "service": "test-crash-pod",
+  "severity": "CRITICAL",
+  "event_type": "crashloopbackoff",
+  "namespace": "demo-apps",
+  "message": "Container crash-looping: back-off 5m0s restarting",
+  "timestamp": "2026-06-25T12:34:56.789012+00:00"
 }
 ```
 
@@ -916,12 +892,86 @@ Diagnostics complete
 | `SENTINEL_TRANSPORT_RETRY_INTERVAL_SECONDS` | `settings.transport.retry_interval_seconds` | `30` |
 | `SENTINEL_TRANSPORT_MOCK_MODE` | `settings.transport.mock_mode` | `true` |
 
-### Mock Mode
+## End-to-End Testing
 
-When `SENTINEL_TRANSPORT_MOCK_MODE=true` (the default), the client logs the payload and returns
-a synthetic `{"accepted": True}` response instead of making an HTTP call. The full delivery
-lifecycle (enqueue → deliver → DELIVERED/FAILED) still executes, so all transport internals
-can be tested and verified without a live control plane.
+The transport pipeline has been validated end-to-end using two kind clusters on the same Docker network.
+
+### Topology
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Docker kind network (172.18.0.0/16)                     │
+│                                                          │
+│  ┌─ sentinel cluster (port 43513) ─┐  ┌─ target cluster │
+│  │                                    │  (port 43091)   │
+│  │ sentinel-api     NodePort 30586 ──── sentinel-agent  │
+│  │ RabbitMQ                          │  test-detection  │
+│  │ incident worker                   │  pods            │
+│  └────────────────────────────────────┘                 │
+└──────────────────────────────────────────────────────────┘
+```
+
+Both clusters are created on the same Docker network (`kind`). The sentinel-api is exposed via NodePort 30586 on the control-plane node (172.18.0.3). The agent pod in the target cluster reaches it at `http://172.18.0.3:30586`.
+
+### Setup
+
+```bash
+# Create sentinel cluster (API, RabbitMQ, workers)
+kind create cluster --name sentinel --config ~/SentinelAI-v1/kind-config.yaml
+kubectl apply -f ~/SentinelAI-v1/k8s/namespace.yaml
+kubectl apply -f ~/SentinelAI-v1/k8s/
+
+# Create target cluster (agent + test pods)
+kind create cluster --name target --config ~/Sentinel-Agent/kind-config.yaml
+kubectl apply -f ~/Sentinel-Agent/k8s/namespace.yaml
+kubectl apply -f ~/Sentinel-Agent/k8s/
+
+# Build and load sentinel-api image
+docker build -t sentinel-api:latest ~/SentinelAI-v1
+kind load docker-image sentinel-api:latest --name sentinel
+kubectl rollout restart deployment -n sentinel
+
+# Build and load sentinel-agent image
+docker build -t sentinel-agent:latest ~/Sentinel-Agent
+kind load docker-image sentinel-agent:latest --name target
+kubectl rollout restart deployment -n sentinel-agent
+```
+
+### Verification
+
+Create a failing pod in the target cluster to trigger the full pipeline:
+
+```bash
+kubectl run test-e2e --image=does-not-exist -n demo-apps
+
+# Watch the agent detect, collect, diagnose, and deliver
+kubectl logs -n sentinel-agent -l app.kubernetes.io/name=sentinel-agent
+
+# Expected events in order:
+# 1. incident_detected — detector finds the failure
+# 2. context_collected — evidence gathered
+# 3. diagnostic_completed — root cause identified
+# 4. report_enqueued — transport creates PENDING record
+# 5. report_delivered — HTTP POST to sentinel-api returns 200
+
+# On the sentinel side, check the incident worker consumed it:
+kubectl logs -n sentinel -l app.kubernetes.io/name=sentinel-worker
+# Expected: "Received incident" with the pod details
+```
+
+### Cross-Cluster Networking
+
+Kind clusters share a Docker bridge network. The sentinel-api control-plane node is reachable from the target cluster at `172.18.0.3:30586`.
+
+- **sentinel-api node IP**: `172.18.0.3` (check with `kubectl get nodes -o wide -n sentinel`)
+- **NodePort**: `30586` (configured in sentinel-api service)
+- **Transport URL** in `values.yaml`: `http://172.18.0.3:30586`
+
+If IPs differ (Docker bridge assignment varies), re-check and update `charts/sentinel-agent/values.yaml`:
+
+```bash
+kubectl get nodes -o wide -n sentinel  # get INTERNAL-IP
+```
 
 ## How to Run
 
@@ -993,9 +1043,9 @@ helm install sentinel-agent ./charts/sentinel-agent
 
 # Override values
 helm install sentinel-agent ./charts/sentinel-agent \
-  --set sentinel.apiUrl=https://your-sentinel.example.com \
-  --set sentinel.registrationToken=your-token \
-  --set sentinel.mockMode=false
+  --set sentinel.apiUrl=http://172.18.0.3:30586 \
+  --set sentinel.mockMode=false \
+  --set sentinel.registrationToken=your-token
 
 # Upgrade
 helm upgrade sentinel-agent ./charts/sentinel-agent
@@ -1021,10 +1071,10 @@ No write permissions are granted. This follows the principle of least privilege.
 
 ### Health Checks
 
-The agent uses exec-based liveness and readiness probes &mdash; no HTTP server is required.
+The agent uses exec-based liveness and readiness probes — no HTTP server is required.
 
-- **Liveness probe**: Runs `cli_health()` every 15s. Exits 0 when the startup marker file exists.
-- **Readiness probe**: Runs `cli_ready()` every 10s. Exits 0 when startup has completed.
+- **Liveness probe**: checks `/tmp/sentinel-agent-ready` marker file every 15s
+- **Readiness probe**: checks `RuntimeManager.started` flag every 10s
 
 ### Created Resources
 

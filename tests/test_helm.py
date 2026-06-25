@@ -30,8 +30,8 @@ _CHART_PATH = Path("charts/sentinel-agent")
 _EXPECTED_RESOURCES: dict[str, str] = {
     "Deployment": "sentinel-agent",
     "ServiceAccount": "sentinel-agent",
-    "Role": "sentinel-agent-role",
-    "RoleBinding": "sentinel-agent-rolebinding",
+    "ClusterRole": "sentinel-agent-role",
+    "ClusterRoleBinding": "sentinel-agent-rolebinding",
     "ConfigMap": "sentinel-agent-config",
     "Secret": "sentinel-agent-secret",
 }
@@ -129,6 +129,34 @@ def test_deployment_container() -> None:
     assert secret_refs[0]["secretRef"]["name"] == "sentinel-agent-secret"
 
 
+def test_deployment_volume_mounts() -> None:
+    """Deployment mounts an emptyDir volume at /data for the SQLite database."""
+    docs = _render_chart()
+    resources = _collect_resources(docs)
+    deployment = resources[("Deployment", "sentinel-agent")]
+    pod_spec = deployment["spec"]["template"]["spec"]
+
+    # Verify container volume mount
+    container = pod_spec["containers"][0]
+    volume_mounts = container.get("volumeMounts", [])
+    data_mount = next(
+        (vm for vm in volume_mounts if vm.get("mountPath") == "/data"),
+        None,
+    )
+    assert data_mount is not None, "Missing volumeMount for /data"
+    assert data_mount["name"] == "data"
+
+    # Verify emptyDir volume
+    volumes = pod_spec.get("volumes", [])
+    data_volume = next(
+        (v for v in volumes if v.get("name") == "data"),
+        None,
+    )
+    assert data_volume is not None, "Missing volume named 'data'"
+    assert "emptyDir" in data_volume, "data volume must be emptyDir"
+    assert data_volume["emptyDir"] == {}, "emptyDir should be default (no custom config)"
+
+
 def test_deployment_probes() -> None:
     """Deployment has liveness and readiness probes with exec commands."""
     docs = _render_chart()
@@ -171,6 +199,18 @@ def test_configmap_env_vars() -> None:
         assert key in data, f"Missing ConfigMap key: {key}"
 
 
+def test_configmap_default_database_url() -> None:
+    """ConfigMap sets ``SENTINEL_STORAGE_DATABASE_URL`` to the
+    container-writable path ``/data/sentinel_agent.db`` by default."""
+    docs = _render_chart()
+    resources = _collect_resources(docs)
+    configmap = resources[("ConfigMap", "sentinel-agent-config")]
+    db_url = configmap.get("data", {}).get("SENTINEL_STORAGE_DATABASE_URL")
+    assert db_url == "sqlite:////data/sentinel_agent.db", (
+        f"Expected sqlite:////data/sentinel_agent.db, got {db_url}"
+    )
+
+
 def test_secret_contains_token() -> None:
     """Secret contains the ``sentinel-registration-token`` key."""
     docs = _render_chart()
@@ -183,10 +223,10 @@ def test_secret_contains_token() -> None:
 
 
 def test_rbac_role() -> None:
-    """Role defines correct readonly rules."""
+    """ClusterRole defines correct readonly rules."""
     docs = _render_chart()
     resources = _collect_resources(docs)
-    role = resources[("Role", "sentinel-agent-role")]
+    role = resources[("ClusterRole", "sentinel-agent-role")]
     rules = role.get("rules", [])
     assert len(rules) > 0
 
@@ -194,15 +234,15 @@ def test_rbac_role() -> None:
     for rule in rules:
         verbs = set(rule.get("verbs", []))
         assert verbs.issubset(readonly_verbs), (
-            f"Role rule uses non-readonly verbs: {verbs - readonly_verbs}"
+            f"ClusterRole rule uses non-readonly verbs: {verbs - readonly_verbs}"
         )
 
 
 def test_rbac_rolebinding() -> None:
-    """RoleBinding binds the correct ServiceAccount."""
+    """ClusterRoleBinding binds the correct ServiceAccount."""
     docs = _render_chart()
     resources = _collect_resources(docs)
-    binding = resources[("RoleBinding", "sentinel-agent-rolebinding")]
+    binding = resources[("ClusterRoleBinding", "sentinel-agent-rolebinding")]
 
     subjects = binding.get("subjects", [])
     assert len(subjects) == 1
@@ -210,7 +250,7 @@ def test_rbac_rolebinding() -> None:
     assert subjects[0]["name"] == "sentinel-agent"
 
     role_ref = binding.get("roleRef", {})
-    assert role_ref.get("kind") == "Role"
+    assert role_ref.get("kind") == "ClusterRole"
     assert role_ref.get("name") == "sentinel-agent-role"
 
 
@@ -270,6 +310,18 @@ def test_dockerfile_nonroot() -> None:
     """Dockerfile sets a non-root user."""
     content = Path("Dockerfile").read_text()
     assert "USER sentinel" in content or "USER 1000" in content
+
+
+def test_dockerfile_creates_data_dir() -> None:
+    """Dockerfile creates ``/data`` with sentinel ownership for
+    writable SQLite storage."""
+    content = Path("Dockerfile").read_text()
+    assert "mkdir -p /data" in content, (
+        "Dockerfile must create /data directory"
+    )
+    assert "chown sentinel:sentinel /data" in content, (
+        "Dockerfile must set sentinel ownership on /data"
+    )
 
 
 def test_dockerignore_exists() -> None:

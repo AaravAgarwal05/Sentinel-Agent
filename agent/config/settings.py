@@ -70,7 +70,35 @@ class RuntimeConfig(BaseModel):
 class StorageConfig(BaseModel):
     """Local persistence layer connection settings."""
 
-    database_url: str = Field(default="sqlite:///./sentinel_agent.db", min_length=1)
+    database_url: str = Field(
+        default="sqlite:////data/sentinel_agent.db", min_length=1
+    )
+
+
+class DetectionConfig(BaseModel):
+    """Detection engine settings."""
+
+    enabled: bool = Field(default=True)
+    polling_interval_seconds: int = Field(default=60, gt=0)
+
+
+class CollectionConfig(BaseModel):
+    """Context collection settings for incident evidence gathering."""
+
+    enabled: bool = Field(default=True)
+    max_events: int = Field(default=20, ge=1)
+
+
+class TransportConfig(BaseModel):
+    """Outbound delivery settings for diagnostic report transport."""
+
+    enabled: bool = Field(default=True)
+    base_url: str = Field(default="https://api.sentinel.example.com", min_length=1)
+    api_key: str = Field(default="")
+    timeout_seconds: int = Field(default=10, gt=0)
+    max_retries: int = Field(default=5, ge=0)
+    retry_interval_seconds: int = Field(default=30, gt=0)
+    mock_mode: bool = Field(default=True)
 
 
 # Mapping of root config domain -> list of leaf field names. Drives
@@ -82,6 +110,12 @@ _FIELD_MAP: dict[str, list[str]] = {
     "heartbeat": ["interval_seconds"],
     "runtime": ["log_level"],
     "storage": ["database_url"],
+    "detection": ["enabled", "polling_interval_seconds"],
+    "collection": ["enabled", "max_events"],
+    "transport": [
+        "enabled", "base_url", "api_key", "timeout_seconds",
+        "max_retries", "retry_interval_seconds", "mock_mode",
+    ],
 }
 
 _ENV_PREFIX = "SENTINEL_"
@@ -145,6 +179,9 @@ class Settings(BaseSettings):
     heartbeat: HeartbeatConfig = Field(default_factory=HeartbeatConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
+    detection: DetectionConfig = Field(default_factory=DetectionConfig)
+    collection: CollectionConfig = Field(default_factory=CollectionConfig)
+    transport: TransportConfig = Field(default_factory=TransportConfig)
 
     @classmethod
     def settings_customise_sources(

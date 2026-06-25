@@ -16,7 +16,15 @@ heartbeat:
   intervalSeconds: 30
 
 storage:
-  databaseUrl: sqlite:///./sentinel_agent.db
+  databaseUrl: sqlite:////data/sentinel_agent.db
+
+collection:
+  enabled: true
+  maxEvents: 20
+  transport:
+    enabled: true
+    baseUrl: http://172.18.0.3:30586
+    mockMode: false
 
 resources:
   requests:

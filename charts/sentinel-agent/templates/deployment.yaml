@@ -50,6 +50,12 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             runAsGroup: 1000
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

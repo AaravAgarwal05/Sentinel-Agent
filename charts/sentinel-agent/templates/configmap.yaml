@@ -14,3 +14,8 @@ data:
   SENTINEL_HEARTBEAT_INTERVAL_SECONDS: {{ .Values.heartbeat.intervalSeconds | quote }}
   SENTINEL_RUNTIME_LOG_LEVEL: INFO
   SENTINEL_STORAGE_DATABASE_URL: {{ .Values.storage.databaseUrl }}
+  SENTINEL_TRANSPORT_ENABLED: {{ .Values.collection.transport.enabled | quote }}
+  SENTINEL_TRANSPORT_BASE_URL: {{ .Values.collection.transport.baseUrl }}
+  SENTINEL_TRANSPORT_MOCK_MODE: {{ .Values.collection.transport.mockMode | quote }}
+  SENTINEL_COLLECTION_ENABLED: {{ .Values.collection.enabled | quote }}
+  SENTINEL_COLLECTION_MAX_EVENTS: {{ .Values.collection.maxEvents | quote }}

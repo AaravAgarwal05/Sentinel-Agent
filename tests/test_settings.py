@@ -38,7 +38,7 @@ def test_settings_load_with_defaults() -> None:
     assert settings.sentinel.registration_token == ""
     assert settings.heartbeat.interval_seconds == 30
     assert settings.runtime.log_level == "INFO"
-    assert settings.storage.database_url == "sqlite:///./sentinel_agent.db"
+    assert settings.storage.database_url == "sqlite:////data/sentinel_agent.db"
 
 
 def test_get_settings_returns_settings_instance() -> None:

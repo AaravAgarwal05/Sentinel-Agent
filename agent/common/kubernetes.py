@@ -18,6 +18,7 @@ class KubernetesClient:
         """Initialize the client, attempting in-cluster config first."""
         self._available: bool = False
         self._api: k8s_client.CoreV1Api | None = None
+        self._version_api: k8s_client.VersionApi | None = None
         self._load_config()
 
     def _load_config(self) -> None:
@@ -37,6 +38,7 @@ class KubernetesClient:
 
         try:
             self._api = k8s_client.CoreV1Api()
+            self._version_api = k8s_client.VersionApi()
             self._available = True
         except Exception:
             self._available = False
@@ -47,11 +49,15 @@ class KubernetesClient:
         return self._available
 
     def get_cluster_version(self) -> str | None:
-        """Return the Kubernetes server version (e.g. "1.28.3") or None."""
-        if not self._available or self._api is None:
+        """Return the Kubernetes server version (e.g. "1.28.3") or None.
+
+        Uses ``VersionApi`` rather than ``CoreV1Api`` -- ``CoreV1Api``
+        does not expose a ``get_code`` method.
+        """
+        if not self._available or self._version_api is None:
             return None
         try:
-            code = self._api.get_code()
+            code = self._version_api.get_code()
             return str(code.git_version)
         except Exception:
             return None

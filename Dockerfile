@@ -1,7 +1,9 @@
 # Stage 1: builder
 FROM python:3.11-slim AS builder
 
-RUN pip install poetry==2.1.1
+ENV POETRY_VIRTUALENVS_IN_PROJECT=true
+
+RUN pip install --no-cache-dir poetry
 
 WORKDIR /build
 COPY pyproject.toml poetry.lock ./
@@ -16,14 +18,15 @@ ENV PYTHONUNBUFFERED=1 \
 COPY --from=builder /build/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
+RUN groupadd --system sentinel && \
+    useradd --system --gid sentinel --no-create-home sentinel && \
+    mkdir -p /data && chown sentinel:sentinel /data
+
 WORKDIR /app
 COPY agent/ /app/agent/
 COPY src/ /app/src/
 COPY alembic/ /app/alembic/
 COPY alembic.ini /app/alembic.ini
-
-RUN groupadd --system sentinel && \
-    useradd --system --gid sentinel --no-create-home sentinel
 
 USER sentinel
 
